@@ -1,0 +1,7 @@
+datasets[audio]
+peft
+tensorboard
+timm
+torch<2.7
+transformers<4.55
+trl
