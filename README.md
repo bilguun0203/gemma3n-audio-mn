@@ -19,6 +19,8 @@ The model is trained on multiple Mongolian and English audio datasets:
 
 ## Demo
 
+Fine-tuned model can be found at: [`bilguun/gemma-3n-E2B-it-audio-en-mn`](https://huggingface.co/bilguun/gemma-3n-E2B-it-audio-en-mn)
+
 Run the fine-tuned model in a Jupyter Notebook:
 
 ```bash
