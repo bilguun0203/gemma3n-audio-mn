@@ -1,3 +1,14 @@
+---
+title: Gemma3n Audio Mn
+emoji: 😻
+colorFrom: pink
+colorTo: yellow
+sdk: gradio
+sdk_version: 5.41.1
+app_file: app.py
+pinned: false
+---
+
 # Gemma 3n Audio Fine-tuning for Mongolian
 
 Fine-tuning Google's Gemma 3n multimodal model for audio transcription and translation between English and Mongolian languages.
