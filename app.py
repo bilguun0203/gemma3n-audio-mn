@@ -1,26 +1,26 @@
-import gc
+from threading import Thread
 
 import gradio as gr
 import spaces
 import torch
 from transformers import AutoModelForImageTextToText, AutoProcessor
-
+from transformers.generation.streamers import TextIteratorStreamer
 
 BASE_GEMMA_MODEL_ID = "google/gemma-3n-E2B-it"
 GEMMA_MODEL_ID = "bilguun/gemma-3n-E2B-it-audio-en-mn"
 
 print("Loading processor and model...")
-processor = AutoProcessor.from_pretrained(BASE_GEMMA_MODEL_ID, device_map="cuda")
-model = AutoModelForImageTextToText.from_pretrained(GEMMA_MODEL_ID, device_map="cuda")
-
-if hasattr(model, "eval"):
-    model.eval()
+processor = AutoProcessor.from_pretrained(BASE_GEMMA_MODEL_ID)
+model = AutoModelForImageTextToText.from_pretrained(
+    GEMMA_MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto"
+)
 
 print("Model loaded successfully!")
 
 
-@spaces.GPU
-def process_audio(audio_file, prompt_type):
+@spaces.GPU(duration=60)
+@torch.inference_mode()
+def process_audio(audio_file, prompt_type, max_tokens):
     if audio_file is None:
         return "Please upload an audio file."
 
@@ -32,55 +32,44 @@ def process_audio(audio_file, prompt_type):
 
     selected_prompt = prompts[prompt_type]
 
-    try:
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "audio", "audio": audio_file},
-                    {"type": "text", "text": selected_prompt},
-                ],
-            }
-        ]
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "audio", "audio": audio_file},
+                {"type": "text", "text": selected_prompt},
+            ],
+        }
+    ]
 
-        with torch.no_grad():
-            input_ids = processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt",
-            )
+    input_ids = processor.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        return_tensors="pt",
+    )
 
-            input_ids = {
-                k: v.to(model.device, dtype=torch.long if "input_ids" in k else v.dtype)
-                for k, v in input_ids.items()
-            }
+    input_ids = input_ids.to(model.device, dtype=model.dtype)
 
-            outputs = model.generate(
-                **input_ids,
-                max_new_tokens=128,
-                pad_token_id=processor.tokenizer.eos_token_id,
-            )
+    streamer = TextIteratorStreamer(
+        processor, timeout=30.0, skip_prompt=True, skip_special_tokens=True
+    )
 
-            input_length = input_ids["input_ids"].shape[1]
-            generated_tokens = outputs[:, input_length:]
+    generate_kwargs = dict(
+        input_ids,
+        streamer=streamer,
+        max_new_tokens=max_tokens,
+        disable_compile=True,
+    )
 
-            text = processor.batch_decode(
-                generated_tokens,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False,
-            )
+    t = Thread(target=model.generate, kwargs=generate_kwargs)
+    t.start()
 
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        del input_ids, outputs, generated_tokens
-        gc.collect()
-
-        return text[0]
-
-    except Exception as e:
-        return f"Error processing audio: {str(e)}"
+    output = ""
+    for delta in streamer:
+        output += delta
+        yield output
 
 
 with gr.Blocks(title="Gemma 3n Audio Transcription & Translation") as demo:
@@ -113,22 +102,54 @@ with gr.Blocks(title="Gemma 3n Audio Transcription & Translation") as demo:
                 max_lines=20,
                 placeholder="Transcribed text will appear here...",
                 show_copy_button=True,
+                interactive=False,
+            )
+
+    with gr.Row():
+        with gr.Accordion("Additional Settings", open=False):
+            max_tokens_slider = gr.Slider(
+                minimum=16,
+                maximum=512,
+                value=128,
+                step=16,
+                label="Max New Tokens",
+                info="Maximum number of tokens to generate",
             )
 
     process_btn.click(
         fn=process_audio,
-        inputs=[audio_input, prompt_dropdown],
+        inputs=[audio_input, prompt_dropdown, max_tokens_slider],
         outputs=output_text,
     )
 
     gr.Examples(
         examples=[
-            ["./audio_samples/en1.wav", "Transcribe"],
-            ["./audio_samples/en3.wav", "Transcribe EN to MN"],
-            ["./audio_samples/mn2.wav", "Transcribe"],
-            ["./audio_samples/mn2.wav", "Transcribe MN to EN"],
+            [
+                "https://github.com/bilguun0203/gemma3n-audio-mn/raw/refs/heads/main/audio_samples/en1.wav",
+                "Transcribe",
+                128,
+            ],
+            [
+                "https://github.com/bilguun0203/gemma3n-audio-mn/raw/refs/heads/main/audio_samples/en3.wav",
+                "Transcribe EN to MN",
+                128,
+            ],
+            [
+                "https://github.com/bilguun0203/gemma3n-audio-mn/raw/refs/heads/main/audio_samples/mn2.wav",
+                "Transcribe",
+                128,
+            ],
+            [
+                "https://github.com/bilguun0203/gemma3n-audio-mn/raw/refs/heads/main/audio_samples/mn2.wav",
+                "Transcribe MN to EN",
+                128,
+            ],
         ],
-        inputs=[audio_input, prompt_dropdown],
+        inputs=[
+            audio_input,
+            prompt_dropdown,
+            max_tokens_slider,
+        ],
         outputs=output_text,
         fn=process_audio,
         cache_examples=True,

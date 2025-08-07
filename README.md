@@ -1,8 +1,8 @@
 ---
 title: Gemma3n Audio Mn
-emoji: 😻
-colorFrom: pink
-colorTo: yellow
+emoji: 🎤
+colorFrom: red
+colorTo: blue
 sdk: gradio
 sdk_version: 5.41.1
 app_file: app.py
