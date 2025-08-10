@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+a {
+    @apply underline hover:bg-emerald-300/40;
+}

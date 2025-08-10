@@ -1,0 +1,35 @@
+---
+import "../styles/global.css";
+---
+
+<html lang="en" class="bg-white dark:bg-black text-black dark:text-white">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>EN-MN Subtitle Generator - Rookie Systems</title>
+    </head>
+    <body class="h-screen flex flex-col">
+        <p
+            class="text-center text-sm bg-amber-300 text-black py-2 px-4 font-mono"
+        >
+            Full app is currently in development; meanwhile, please try out the
+            transcriber demo.
+        </p>
+        <iframe
+            src="https://bilguun-gemma3n-audio-mn.hf.space"
+            frameborder="0"
+            class="w-full h-full"></iframe>
+        <div
+            class="text-center text-sm py-2 px-4 font-mono border-t border-t-stone-400/50"
+        >
+            <a href="https://rookies.mn">Rookie Systems</a> · <a
+                href="https://github.com/bilguun0203/gemma3n-audio-mn">Github</a
+            > ·
+            <a href="https://huggingface.co/spaces/bilguun/gemma3n-audio-mn"
+                >HuggingFace</a
+            >
+        </div>
+    </body>
+</html>
